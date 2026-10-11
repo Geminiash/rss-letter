@@ -1,0 +1,23 @@
+services:
+  rss-letter:
+    build: .
+    image: rss-letter:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      RSS_LETTER_DB: /app/data/rss-letter.sqlite
+    ports:
+      # 只绑定本机回环，外网请经反代（Nginx/Caddy）转发
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./data:/app/data
+      # 如需在容器外改模板，取消注释并保持目录结构一致
+      # - ./templates:/app/templates:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
