@@ -55,6 +55,82 @@ ${body}
 </div></body></html>`;
 }
 
+/** 订阅落地页（GET /）：表单 + 蜜罐 + 错误文案映射，样式与确认/退订页一致 */
+export function subscribePage(cfg: AppConfig): string {
+  const zh = cfg.defaultLang === 'zh';
+  const t = zh
+    ? {
+        title: '订阅每周摘要',
+        lead: '订阅后，每周你会收到一封信：过去七天的新内容，按时间排好，没有广告，随时可退订。',
+        email: '邮箱地址',
+        submit: '订阅',
+        ok: '确认邮件已发出，请查收邮箱并点击确认链接。',
+        invalid: '邮箱格式好像不对，再看一眼？',
+        rate: '尝试太频繁了，等一分钟再试。',
+        smtp: '发信服务还没配置好，暂时订阅不了。',
+        fail: '发送失败了，稍后再试一次。',
+      }
+    : {
+        title: 'Subscribe to the weekly letter',
+        lead: 'One email a week: new posts from the past 7 days, newest first. No ads, unsubscribe anytime.',
+        email: 'Email address',
+        submit: 'Subscribe',
+        ok: 'A confirmation email is on its way — please click the link inside.',
+        invalid: "That doesn't look like a valid email.",
+        rate: 'Too many attempts — wait a minute and retry.',
+        smtp: 'The mail service is not configured yet.',
+        fail: 'Sending failed, please retry later.',
+      };
+  const messages = JSON.stringify({
+    ok: t.ok,
+    invalid_email: t.invalid,
+    rate_limited: t.rate,
+    smtp_unconfigured: t.smtp,
+    send_failed: t.fail,
+    fail: t.fail,
+  });
+  return page(
+    cfg,
+    t.title,
+    `<h1 style="margin:0 0 14px;font-size:22px;">${t.title}</h1>
+<p style="margin:0 0 18px;">${t.lead}</p>
+<form id="f" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:0;">
+  <input id="email" type="email" required placeholder="${t.email}" autocomplete="email"
+    style="flex:1;min-width:200px;padding:10px 12px;border:1px solid #d9d9d4;border-radius:8px;font:inherit;background:#fff;color:inherit;" />
+  <input id="website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;" />
+  <button type="submit" style="padding:10px 18px;border:0;border-radius:8px;background:#46688c;color:#fff;font:inherit;cursor:pointer;">${t.submit}</button>
+</form>
+<p id="msg" style="display:none;margin:16px 0 0;color:#8a5a2b;"></p>
+<script>
+(() => {
+  const form = document.getElementById('f');
+  const msg = document.getElementById('msg');
+  const map = ${messages};
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.style.display = 'none';
+    const payload = { email: document.getElementById('email').value.trim() };
+    const honeypot = document.getElementById('website').value;
+    if (honeypot) payload.website = honeypot;
+    let code = 'fail';
+    try {
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      code = json.ok ? 'ok' : json.error || 'fail';
+    } catch {}
+    msg.textContent = map[code] || map.fail;
+    msg.style.display = 'block';
+  });
+})();
+</script>`,
+    cfg.defaultLang,
+  );
+}
+
 export function createApp(cfg: AppConfig, deps: AppDeps = {}): Hono {
   const app = new Hono();
   const limiter =
@@ -69,6 +145,8 @@ export function createApp(cfg: AppConfig, deps: AppDeps = {}): Hono {
     const bearer = auth?.startsWith('Bearer ') ? auth.slice(7) : undefined;
     return header === cfg.adminToken || bearer === cfg.adminToken;
   };
+
+  app.get('/', (c) => c.html(subscribePage(cfg)));
 
   app.get('/api/health', (c) =>
     c.json({ ok: true, service: 'rss-letter', sources: cfg.rssSources.length }),

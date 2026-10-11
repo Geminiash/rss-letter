@@ -67,6 +67,17 @@ function get(path: string, ip = '203.0.113.1'): Promise<Response> {
   return app.request(path, { headers: { 'x-forwarded-for': ip } });
 }
 
+describe('GET /', () => {
+  it('订阅落地页：表单与蜜罐齐备', async () => {
+    const res = await get('/');
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('id="email"');
+    expect(html).toContain('id="website"');
+    expect(html).toContain('/api/subscribe');
+  });
+});
+
 describe('GET /api/health', () => {
   it('返回 ok 与源数量', async () => {
     const res = await get('/api/health');

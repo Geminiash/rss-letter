@@ -4,7 +4,8 @@ services:
     image: rss-letter:latest
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       HOST: 0.0.0.0
       RSS_LETTER_DB: /app/data/rss-letter.sqlite
